@@ -17,72 +17,18 @@
     #progress-bar{height:100%;width:0;background:#007bff;transition:width 0.3s}
     #ok{margin-top:15px;font-weight:bold;color:green}
     h2{color:#007bff}
-    .camera-actions{
-      width:90%;
-      margin:10px auto 0;
-      display:flex;
-      justify-content:center;
-      gap:10px;
-    }
-    .camera-actions button{
-      width:100%;
-      padding:14px;
-      font-size:16px;
-      margin:0;
-    }
+    .camera-actions{width:90%;margin:10px auto 0;display:flex;justify-content:center;gap:10px}
+    .camera-actions button{width:100%;padding:14px;font-size:16px;margin:0}
 
-    /* FOTO DE EXEMPLO RESPONSIVA */
-    .obs p {
-      font-size: 14px;
-      line-height: 1.5;
-      margin: 10px 0;
-    }
-    .exemplo-container {
-      width: 90%;
-      max-width: 400px;
-      margin: 20px auto;
-      border: 2px dashed #007bff;
-      border-radius: 12px;
-      overflow: hidden;
-      background: #f0f8ff;
-      padding: 10px;
-      box-sizing: border-box;
-    }
-    .exemplo-img {
-      width: 100%;
-      height: auto;
-      max-height: 300px;
-      object-fit: contain;
-      border-radius: 8px;
-      display: block;
-      margin: 0 auto;
-    }
+    /* FOTO DE EXEMPLO */
+    .obs p{font-size:14px;line-height:1.5;margin:10px 0}
+    .exemplo-container{width:90%;max-width:400px;margin:20px auto;border:2px dashed #007bff;border-radius:12px;overflow:hidden;background:#f0f8ff;padding:10px;box-sizing:border-box}
+    .exemplo-img{width:100%;height:auto;max-height:300px;object-fit:contain;border-radius:8px;display:block;margin:0 auto}
 
     /* LOADING */
-    #loading {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,123,255,0.9);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      font-size: 16px;
-      z-index: 9999;
-      text-align: center;
-    }
-    .spinner {
-      border: 3px solid rgba(255,255,255,0.3);
-      border-top: 3px solid white;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 10px;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #loading{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,123,255,0.9);color:white;padding:20px;border-radius:10px;font-size:16px;z-index:9999;text-align:center}
+    .spinner{border:3px solid rgba(255,255,255,0.3);border-top:3px solid white;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;margin:0 auto 10px}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
   </style>
 </head>
 <body>
@@ -94,7 +40,6 @@
       <p>⚠️ Fotos devem ser nítidas e bem iluminadas.<br>
       ⚠️ Fotos não Legíveis serão solicitadas novamente.<br>
       ⚠️ O site pedirá permissões — clique em "Permitir" para continuar.</p>
-
       <div class="exemplo-container">
         <img src="exemplo.jpg" alt="Foto de exemplo" class="exemplo-img" onerror="this.style.display='none'">
       </div>
@@ -110,16 +55,14 @@
     <p id="ok"></p>
   </div>
 
-  <!-- LOADING -->
   <div id="loading">
     <div class="spinner"></div>
-    Processando foto com marca d'água...
+    Processando foto...
   </div>
 
   <script>
     let fotos = [], lat = null, lng = null, gpsPronto = false;
 
-    // Validação de placa
     document.getElementById('placa').addEventListener('input', function(e) {
       let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (v.length > 7) v = v.slice(0,7);
@@ -167,7 +110,6 @@
       reader.onload = ev => {
         const img = new Image();
         img.onload = () => {
-          // REDIMENSIONA A IMAGEM (máx 800px largura)
           const maxWidth = 800;
           let { width, height } = img;
           if (width > maxWidth) {
@@ -181,51 +123,35 @@
           canvas.height = height;
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Configuração do texto
-          const fontSize = Math.max(24, width / 25);
+          const fontSize = Math.max(20, width / 30);
+          const padding = 10;
+          const lineHeight = fontSize * 1.4;
+          const startY = height - lineHeight * 2.8;
+
+          // Linha 1: Data/Hora
           ctx.font = `bold ${fontSize}px Arial`;
-          ctx.textAlign = 'left';
-
-          // Posições com mais espaço
-          const padding = 12;
-          const lineHeight = fontSize * 1.3;
-          const startY = height - lineHeight * 3.5;
-
-          // Texto 1: ENTREGUE
-          const text1 = 'ENTREGUE';
-          const text1Width = ctx.measureText(text1).width + padding * 2;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          const dataHora = formatarDataHora();
+          const text1Width = ctx.measureText(dataHora).width + padding * 2;
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
           ctx.fillRect(15, startY - padding, text1Width, lineHeight);
           ctx.fillStyle = 'white';
           ctx.strokeStyle = 'black';
-          ctx.lineWidth = 2.5;
-          ctx.strokeText(text1, 15 + padding, startY);
-          ctx.fillText(text1, 15 + padding, startY);
+          ctx.lineWidth = 2;
+          ctx.strokeText(dataHora, 15 + padding, startY);
+          ctx.fillText(dataHora, 15 + padding, startY);
 
-          // Texto 2: Data/Hora
-          ctx.font = `${fontSize * 0.75}px Arial`;
-          const dataHora = formatarDataHora();
-          const text2Width = ctx.measureText(dataHora).width + padding * 2;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          // Linha 2: GPS
+          ctx.font = `${fontSize * 0.9}px Arial`;
+          const gps = `${lat}, ${lng}`;
+          const text2Width = ctx.measureText(gps).width + padding * 2;
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
           ctx.fillRect(15, startY + lineHeight - padding, text2Width, lineHeight);
           ctx.fillStyle = 'white';
           ctx.strokeStyle = 'black';
           ctx.lineWidth = 1.5;
-          ctx.strokeText(dataHora, 15 + padding, startY + lineHeight);
-          ctx.fillText(dataHora, 15 + padding, startY + lineHeight);
+          ctx.strokeText(gps, 15 + padding, startY + lineHeight);
+          ctx.fillText(gps, 15 + padding, startY + lineHeight);
 
-          // Texto 3: GPS
-          const gps = `${lat}, ${lng}`;
-          const text3Width = ctx.measureText(gps).width + padding * 2;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(15, startY + lineHeight * 2 - padding, text3Width, lineHeight);
-          ctx.fillStyle = 'white';
-          ctx.strokeStyle = 'black';
-          ctx.lineWidth = 1.5;
-          ctx.strokeText(gps, 15 + padding, startY + lineHeight * 2);
-          ctx.fillText(gps, 15 + padding, startY + lineHeight * 2);
-
-          // GERA A IMAGEM
           canvas.toBlob(blob => {
             const novoArquivo = new File([blob], `entrega_${Date.now()}.jpg`, { type: 'image/jpeg' });
             callback(novoArquivo);
