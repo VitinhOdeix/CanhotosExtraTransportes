@@ -135,52 +135,49 @@
       reader.onload = ev => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-    
           // Configuração do texto
           const fontSize = Math.max(30, img.width / 20);
           ctx.font = `bold ${fontSize}px Arial`;
           ctx.textAlign = 'left';
-    
-          // FUNDO SEMITRANSPARENTE (opcional, melhora contraste)
-          const textX = 30;
-          const textY1 = img.height - 100;
-          const textY2 = img.height - 60;
-          const textY3 = img.height - 20;
-    
+          
+          // Posições com mais espaço
+          const padding = 15;
+          const lineHeight = fontSize * 1.2;
+          const startY = img.height - lineHeight * 3.5; // Começa mais de cima
+          
           // Texto 1: ENTREGUE
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // fundo preto semitransparente
-          ctx.fillRect(textX - 10, textY1 - fontSize, ctx.measureText('ENTREGUE').width + 20, fontSize + 10);
+          const text1 = 'ENTREGUE';
+          const text1Width = ctx.measureText(text1).width + padding * 2;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+          ctx.fillRect(20, startY - padding, text1Width, lineHeight);
           ctx.fillStyle = 'white';
           ctx.strokeStyle = 'black';
           ctx.lineWidth = 3;
-          ctx.strokeText('ENTREGUE', textX, textY1);
-          ctx.fillText('ENTREGUE', textX, textY1);
-    
+          ctx.strokeText(text1, 20 + padding, startY);
+          ctx.fillText(text1, 20 + padding, startY);
+          
           // Texto 2: Data/Hora
           ctx.font = `${fontSize * 0.8}px Arial`;
           const dataHora = formatarDataHora();
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.fillRect(textX - 10, textY2 - (fontSize * 0.8), ctx.measureText(dataHora).width + 20, fontSize * 0.8 + 10);
+          const text2Width = ctx.measureText(dataHora).width + padding * 2;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+          ctx.fillRect(20, startY + lineHeight - padding, text2Width, lineHeight);
           ctx.fillStyle = 'white';
           ctx.strokeStyle = 'black';
           ctx.lineWidth = 2;
-          ctx.strokeText(dataHora, textX, textY2);
-          ctx.fillText(dataHora, textX, textY2);
-    
+          ctx.strokeText(dataHora, 20 + padding, startY + lineHeight);
+          ctx.fillText(dataHora, 20 + padding, startY + lineHeight);
+          
           // Texto 3: GPS
           const gps = `${lat}, ${lng}`;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.fillRect(textX - 10, textY3 - (fontSize * 0.8), ctx.measureText(gps).width + 20, fontSize * 0.8 + 10);
+          const text3Width = ctx.measureText(gps).width + padding * 2;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+          ctx.fillRect(20, startY + lineHeight * 2 - padding, text3Width, lineHeight);
           ctx.fillStyle = 'white';
           ctx.strokeStyle = 'black';
           ctx.lineWidth = 2;
-          ctx.strokeText(gps, textX, textY3);
-          ctx.fillText(gps, textX, textY3);
+          ctx.strokeText(gps, 20 + padding, startY + lineHeight * 2);
+          ctx.fillText(gps, 20 + padding, startY + lineHeight * 2);
     
           canvas.toBlob(blob => {
             const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
