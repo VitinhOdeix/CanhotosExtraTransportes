@@ -68,8 +68,8 @@
   </div>
 
   <script>
-    // URL DO SEU WEB APP
-    const URL = 'https://script.google.com/macros/s/AKfycbxreTNQhJvHtbECyk7oj3Oi5qzIIaG-bQmIjYJdXtDHQ38syCn52iOgzhscDSvjYlE_KA/exec';
+    // URL DO SEU WEB APP (ATUALIZADA!)
+    const URL = 'https://script.google.com/macros/s/AKfycbx7RkU2UiQzfV2R8fYw4MbIJJ_91MRlzh-js5ksZ_INVyTWRAV9GXjWVOH17gYHSRhdsQ/exec';
 
     let fotos = [], lat = null, lng = null, gpsPronto = false;
     let placaAutorizada = false;
@@ -115,11 +115,10 @@
       fetch(URL, {
         method: 'POST',
         body: JSON.stringify(dados),
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }  // ← CORREÇÃO: text/plain
+        headers: { 'Content-Type': 'application/json' }
       })
-      .then(r => r.text())  // ← CORREÇÃO: r.text()
-      .then(t => {
-        const data = JSON.parse(t);  // ← Parse manual
+      .then(r => r.json())
+      .then(data => {
         btn.disabled = false;
         if (data.status === "OK") {
           placaAutorizada = true;
@@ -279,12 +278,11 @@
           fetch(URL, {
             method: 'POST',
             body: JSON.stringify(dados),
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' }  // ← CORREÇÃO: text/plain
+            headers: { 'Content-Type': 'application/json' }
           })
-          .then(r => r.text())  // ← CORREÇÃO: r.text()
-          .then(t => {
-            const data = JSON.parse(t);  // ← Parse manual
-            if (data.status !== "OK") console.error("Erro no envio da foto:", data.message);
+          .then(r => r.json())
+          .then(data => {
+            if (data.status !== "OK") console.error("Erro no envio:", data.message);
             atualizarProgresso();
           })
           .catch(err => {
