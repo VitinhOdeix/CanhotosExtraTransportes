@@ -109,7 +109,7 @@
 
       const dados = { acao: "verificarPlaca", placa };
 
-      fetch('https://script.google.com/macros/s/AKfycbw3Kce-nUJFqTmyHvK1ZJHMFnbEqFRZmjs-VOlSeLs_LgLl7MTp-v6ZVMcCu3ZnQ0FBpA/exec', {
+      fetch('https://script.google.com/macros/s/AKfycbw3zy9f7PWR9Zuhpuru0POb1lo5xsAOoman7WsZy2shmH-Jtt3tS38TpXn9uaVKVwXknQ/exec', {
         method: 'POST',
         body: JSON.stringify(dados),
         headers: { 'Content-Type': 'application/json' }
@@ -272,7 +272,7 @@
             nome: `${nota}_${i+1}_${placaUsada}.jpg`,
             file: b
           };
-          fetch('https://script.google.com/macros/s/AKfycbw3Kce-nUJFqTmyHvK1ZJHMFnbEqFRZmjs-VOlSeLs_LgLl7MTp-v6ZVMcCu3ZnQ0FBpA/exec', {
+          fetch('https://script.google.com/macros/s/AKfycbw3zy9f7PWR9Zuhpuru0POb1lo5xsAOoman7WsZy2shmH-Jtt3tS38TpXn9uaVKVwXknQ/exec', {
             method: 'POST',
             body: JSON.stringify(dados),
             headers: { 'Content-Type': 'application/json' }
