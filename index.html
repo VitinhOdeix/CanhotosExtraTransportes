@@ -110,60 +110,36 @@
       reader.onload = ev => {
         const img = new Image();
         img.onload = () => {
-          // Redimensiona imagem (máx 800px largura)
-          const maxWidth = 800;
-          let { width, height } = img;
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width;
-            width = maxWidth;
-          }
-    
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
     
-          // Configuração geral
-          const fontSize = Math.max(20, width / 30);
-          const padding = 12;
-          const lineHeight = fontSize * 1.4;
-          const startY = height - lineHeight * 2.8;
+          // Fundo semi-transparente
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(0, img.height - 110, img.width, 110);
     
-          // Função para desenhar linha com fundo perfeito
-          function desenharLinha(texto, y, isBold = false) {
-            const font = isBold ? `bold ${fontSize}px Arial` : `${fontSize * 0.9}px Arial`;
-            ctx.font = font;
-            
-            const textWidth = ctx.measureText(texto).width;
-            const strokeWidth = isBold ? 2 : 1.5;
-            const totalWidth = textWidth + padding * 2 + strokeWidth * 2;
-            
-            // Fundo preto ajustado
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            ctx.fillRect(15, y - lineHeight + (lineHeight - fontSize)/2 - padding, totalWidth, lineHeight);
-            
-            // Texto com contorno
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = strokeWidth;
-            ctx.strokeText(texto, 15 + padding + strokeWidth, y);
-            ctx.fillText(texto, 15 + padding + strokeWidth, y);
-          }
+          // ENTREGUE
+          ctx.font = 'bold 35px Arial';
+          ctx.fillStyle = '#00ff00';
+          ctx.textAlign = 'right';
+          ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
     
-          // Linha 1: Data/Hora
-          const dataHora = formatarDataHora();
-          desenharLinha(dataHora, startY, true);
+          // Data e hora
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
     
-          // Linha 2: GPS
-          const gps = `${lat}, ${lng}`;
-          desenharLinha(gps, startY + lineHeight, false);
+          // GPS
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffff00';
+          ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
     
-          // Gera o arquivo
           canvas.toBlob(blob => {
-            const novoArquivo = new File([blob], `entrega_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
             callback(novoArquivo);
-          }, 'image/jpeg', 0.85);
+          }, 'image/jpeg', 0.9);
         };
         img.src = ev.target.result;
       };
