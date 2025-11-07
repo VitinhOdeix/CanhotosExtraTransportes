@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Extra Transportes</title>
+  <style>
+    body{font-family:Arial;background:#f8f9fa;margin:0;padding:20px;text-align:center}
+    .c{background:#fff;max-width:420px;margin:auto;padding:30px;border-radius:25px;box-shadow:0 15px 40px rgba(0,0,0,.2);overflow:hidden}
+    .logo{width:280px;margin:20px auto;display:block}
+    input,button{width:90%;padding:16px;margin:12px auto;display:block;border-radius:12px;border:2px solid #007bff;font-size:18px;box-sizing:border-box}
+    button{background:#007bff;color:#fff;font-weight:bold;cursor:pointer}
+    .fotos{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:15px 0}
+    .foto-prev{width:100px;height:100px;object-fit:cover;border-radius:10px;border:2px solid #007bff;position:relative}
+    .remover{position:absolute;top:5px;right:5px;background:red;color:white;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;cursor:pointer}
+    #progress-container{width:90%;height:20px;background:#ddd;border-radius:10px;margin:15px auto;overflow:hidden;display:none}
+    #progress-bar{height:100%;width:0;background:#007bff;transition:width 0.3s}
+    #ok{margin-top:15px;font-weight:bold;color:green}
+    h2{color:#007bff}
+    .camera-actions{width:90%;margin:10px auto 0;display:flex;justify-content:center;gap:10px}
+    .camera-actions button{width:100%;padding:14px;font-size:16px;margin:0}
+
+    /* FOTO DE EXEMPLO */
+    .obs p{font-size:14px;line-height:1.5;margin:10px 0}
+    .exemplo-container{width:90%;max-width:400px;margin:20px auto;border:2px dashed #007bff;border-radius:12px;overflow:hidden;background:#f0f8ff;padding:10px;box-sizing:border-box}
+    .exemplo-img{width:100%;height:auto;max-height:300px;object-fit:contain;border-radius:8px;display:block;margin:0 auto}
+
+    /* LOADING */
+    #loading{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,123,255,0.9);color:white;padding:20px;border-radius:10px;font-size:16px;z-index:9999;text-align:center}
+    .spinner{border:3px solid rgba(255,255,255,0.3);border-top:3px solid white;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;margin:0 auto 10px}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div class="c">
+    <img src="logo.png" alt="Extra Transportes" class="logo" onerror="this.style.display='none'">
+    <h2>Comprovante de Entrega</h2>
+
+    <div class="obs">
+      <p>⚠️ Fotos devem ser nítidas e bem iluminadas.<br>
+      ⚠️ Fotos não Legíveis serão solicitadas novamente.<br>
+      ⚠️ O site pedirá permissões — clique em "Permitir" para continuar.</p>
+      <div class="exemplo-container">
+        <img src="exemplo.jpg" alt="Foto de exemplo" class="exemplo-img" onerror="this.style.display='none'">
+      </div>
+    </div>
+
+    <input type="text" id="motorista" placeholder="Nome do Motorista" required>
+    <input type="text" id="nota" placeholder="Número da Nota/CT-e" required>
+    <input type="text" id="placa" placeholder="Placa (ex: ABC1D23)" maxlength="7" required>
+    <button onclick="iniciar()">Iniciar Comprovante</button>
+    <div class="fotos" id="fotos"></div>
+    <div id="progress-container"><div id="progress-bar"></div></div>
+    <button onclick="enviar()" id="env" style="display:none">Enviar para Transportadora</button>
+    <p id="ok"></p>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    Processando foto...
+  </div>
+
+  <script>
+    let fotos = [], lat = null, lng = null, gpsPronto = false;
+
+    document.getElementById('placa').addEventListener('input', function(e) {
+      let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (v.length > 7) v = v.slice(0,7);
+      e.target.value = v;
+    });
+
+    function validarPlaca(placa) {
+      const padrao1 = /^[A-Z]{3}\d[A-Z]\d{2}$/;
+      const padrao2 = /^[A-Z]{3}\d{4}$/;
+      return padrao1.test(placa) || padrao2.test(placa);
+    }
+
+    function formatarDataHora() {
+      const agora = new Date();
+      const dia = String(agora.getDate()).padStart(2, '0');
+      const mes = String(agora.getMonth() + 1).padStart(2, '0');
+      const ano = agora.getFullYear();
+      const hora = String(agora.getHours()).padStart(2, '0');
+      const min = String(agora.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${ano} ${hora}:${min}`;
+    }
+
+    function iniciar() {
+      const motorista = document.getElementById('motorista').value.trim();
+      const n = document.getElementById('nota').value.trim();
+      const placa = document.getElementById('placa').value.trim();
+      if (!motorista || !n || !placa) return alert("Preencha todos os campos!");
+      if (!validarPlaca(placa)) return alert("Placa inválida! Use ABC1D23 ou ABC1234");
+
+      if (!gpsPronto) {
+        if (!navigator.geolocation) return alert("GPS não disponível");
+        navigator.geolocation.getCurrentPosition(pos => {
+          lat = pos.coords.latitude.toFixed(6);
+          lng = pos.coords.longitude.toFixed(6);
+          gpsPronto = true;
+          tirarFoto();
+        }, () => alert("Permita o GPS!"));
+      } else {
+        tirarFoto();
+      }
+    }
+
+    function adicionarMarcaDagua(file, callback) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+    
+          // Fundo semi-transparente
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(0, img.height - 110, img.width, 110);
+    
+          // ENTREGUE
+          ctx.font = 'bold 35px Arial';
+          ctx.fillStyle = '#00ff00';
+          ctx.textAlign = 'right';
+          ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
+    
+          // Data e hora
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
+    
+          // GPS
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffff00';
+          ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
+    
+          canvas.toBlob(blob => {
+            const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
+            callback(novoArquivo);
+          }, 'image/jpeg', 0.9);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function tirarFoto() {
+      document.getElementById('loading').style.display = 'block';
+      const i = document.createElement('input');
+      i.type = 'file'; i.accept = 'image/*'; i.capture = 'environment';
+      i.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) {
+          document.getElementById('loading').style.display = 'none';
+          return;
+        }
+        adicionarMarcaDagua(file, arquivoComMarca => {
+          document.getElementById('loading').style.display = 'none';
+          const div = document.createElement('div');
+          div.className = 'foto-prev';
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(arquivoComMarca);
+          img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+          const remover = document.createElement('div');
+          remover.textContent = '×';
+          remover.className = 'remover';
+          remover.onclick = () => {
+            fotos = fotos.filter(f => f !== arquivoComMarca);
+            div.remove();
+            atualizarBotao();
+          };
+          div.appendChild(img);
+          div.appendChild(remover);
+          document.getElementById('fotos').appendChild(div);
+          fotos.push(arquivoComMarca);
+          mostrarAdicionarMais();
+        });
+      };
+      i.click();
+    }
+
+    function mostrarAdicionarMais() {
+      const existente = document.querySelector('.camera-actions');
+      if (existente) existente.remove();
+      const actions = document.createElement('div');
+      actions.className = 'camera-actions';
+      const btnMais = document.createElement('button');
+      btnMais.textContent = 'Adicionar Mais';
+      btnMais.onclick = tirarFoto;
+      actions.appendChild(btnMais);
+      document.getElementById('fotos').appendChild(actions);
+      atualizarBotao();
+    }
+
+    function atualizarBotao() {
+      document.getElementById('env').style.display = fotos.length > 0 ? 'block' : 'none';
+    }
+
+    function enviar(){
+      const envBtn = document.getElementById('env');
+      envBtn.disabled = true;
+      document.getElementById('progress-container').style.display = 'block';
+      document.getElementById('ok').innerHTML = "Enviando...";
+      let enviadas = 0;
+      const total = fotos.length;
+
+      const nota = document.getElementById('nota').value.trim();
+      const placa = document.getElementById('placa').value.trim();
+      const motorista = document.getElementById('motorista').value.trim();
+
+      const atualizarProgresso = () => {
+        enviadas++;
+        document.getElementById('progress-bar').style.width = (enviadas/total*100) + '%';
+        if (enviadas === total) sucesso();
+      };
+
+      fotos.forEach((foto, i) => {
+        const r = new FileReader();
+        r.onload = () => {
+          const b = r.result.split(',')[1];
+          const dados = {
+            nota: nota,
+            placa: placa,
+            motorista: motorista,
+            lat: lat,
+            lng: lng,
+            nome: `${nota}_${i+1}_${placa}.jpg`,
+            file: b
+          };
+
+          fetch('https://script.google.com/macros/s/AKfycbwgCN1zSTV2H4g6P4s5ipv8kFT_47aF3JFRxO9bTj0dZocwqP2j6mJ4lLTQTcxQRr2L6Q/exec', {
+            method: 'POST',
+            body: JSON.stringify(dados),
+            headers: {'Content-Type': 'text/plain'},
+            mode: 'no-cors'
+          }).then(() => atualizarProgresso())
+            .catch(() => atualizarProgresso());
+        };
+        r.readAsDataURL(foto);
+      });
+
+      function sucesso() {
+        document.getElementById('ok').innerHTML="Tudo enviado! Abrindo WhatsApp...";
+        const msg = `Entrega ${nota} com ${total} foto(s)!\nMotorista: ${motorista}\nPlaca: ${placa}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+        setTimeout(() => location.reload(), 3000);
+      }
+    }
+  </script>
+</body>
+</html>
