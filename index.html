@@ -68,91 +68,133 @@
   </div>
 
   <script>
-    const URL = 'https://script.google.com/macros/s/AKfycbxMX4Hpzou3AjBw0K2BqtEGbFsqSqWKvVhMwx97WmWXGQMUKhgXfhda9ar2CWg4oNalAQ/exec';
+    // URL DO SEU WEB APP (ATUALIZADA!)
+    const URL = 'https://script.google.com/macros/s/AKfycbxIFoPXrDQhcgcliGEV1YUKqbBwDfSxAasilF4nwjz1t1_NwghcHMxUFe0DW5SdC0aRbw/exec';
 
     let fotos = [], lat = null, lng = null, gpsPronto = false;
     let placaAutorizada = false, placaUsada = "";
 
-    document.getElementById('placa').addEventListener('input', e => {
+    // Validação de placa
+    document.getElementById('placa').addEventListener('input', function(e) {
       let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (v.length > 7) v = v.slice(0,7);
       e.target.value = v;
     });
 
-    function validarPlaca(p) {
-      return /^[A-Z]{3}\d[A-Z]\d{2}$/.test(p) || /^[A-Z]{3}\d{4}$/.test(p);
+    function validarPlaca(placa) {
+      const padrao1 = /^[A-Z]{3}\d[A-Z]\d{2}$/;
+      const padrao2 = /^[A-Z]{3}\d{4}$/;
+      return padrao1.test(placa) || padrao2.test(placa);
     }
 
     function formatarDataHora() {
-      const d = new Date();
-      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const agora = new Date();
+      const dia = String(agora.getDate()).padStart(2, '0');
+      const mes = String(agora.getMonth() + 1).padStart(2, '0');
+      const ano = agora.getFullYear();
+      const hora = String(agora.getHours()).padStart(2, '0');
+      const min = String(agora.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${ano} ${hora}:${min}`;
     }
 
+    // === VERIFICA PLACA CORRETAMENTE ===
     function verificarPlaca() {
       const placa = document.getElementById('placa').value.trim();
-      if (!placa || !validarPlaca(placa)) return alert("Placa inválida!");
+      if (!placa) return alert("Digite a placa!");
+      if (!validarPlaca(placa)) return alert("Placa inválida!");
 
       const msg = document.getElementById('msg');
-      msg.innerHTML = "Verificando..."; msg.className = "msg";
-      const btn = event.target; btn.disabled = true;
+      msg.innerHTML = "Verificando na planilha...";
+      msg.className = "msg";
+      const btn = event.target;
+      btn.disabled = true;
 
       fetch(URL, {
         method: 'POST',
         body: JSON.stringify({ acao: "verificarPlaca", placa }),
-        mode: 'no-cors'
+        headers: { 'Content-Type': 'text/plain' }
       })
-      .then(() => {
-        setTimeout(() => {
-          btn.disabled = false;
-          placaAutorizada = true; placaUsada = placa;
-          msg.innerHTML = "Placa autorizada!"; msg.className = "msg ok";
-          document.getElementById('app').classList.remove('hidden');
-        }, 1500);
-      })
-      .catch(() => {
+      .then(r => r.text())
+      .then(text => {
         btn.disabled = false;
-        msg.innerHTML = "Erro de conexão";
+        try {
+          const data = JSON.parse(text);
+          if (data.status === "OK") {
+            placaAutorizada = true;
+            placaUsada = placa;
+            msg.innerHTML = "Placa autorizada! Preencha os dados.";
+            msg.className = "msg ok";
+            document.getElementById('app').classList.remove('hidden');
+          } else {
+            msg.innerHTML = data.message || "Placa não autorizada";
+            msg.className = "msg";
+          }
+        } catch (e) {
+          msg.innerHTML = "Erro no servidor: " + text;
+          msg.className = "msg";
+        }
+      })
+      .catch(err => {
+        btn.disabled = false;
+        msg.innerHTML = "Erro de conexão: " + err.message;
+        msg.className = "msg";
       });
     }
 
     function iniciar() {
-      if (!placaAutorizada) return alert("Verifique a placa!");
-      const m = document.getElementById('motorista').value.trim();
-      const n = document.getElementById('nota').value.trim();
-      if (!m || !n) return alert("Preencha todos os campos!");
+      if (!placaAutorizada) return alert("Verifique a placa primeiro!");
+      const motorista = document.getElementById('motorista').value.trim();
+      const nota = document.getElementById('nota').value.trim();
+      if (!motorista || !nota) return alert("Preencha todos os campos!");
 
       if (!gpsPronto) {
-        navigator.geolocation.getCurrentPosition(p => {
-          lat = p.coords.latitude.toFixed(6);
-          lng = p.coords.longitude.toFixed(6);
+        if (!navigator.geolocation) return alert("GPS não disponível");
+        navigator.geolocation.getCurrentPosition(pos => {
+          lat = pos.coords.latitude.toFixed(6);
+          lng = pos.coords.longitude.toFixed(6);
           gpsPronto = true;
           tirarFoto();
         }, () => alert("Permita o GPS!"));
-      } else tirarFoto();
+      } else {
+        tirarFoto();
+      }
     }
 
-    function adicionarMarcaDagua(file, cb) {
-      const r = new FileReader();
-      r.onload = e => {
+    function adicionarMarcaDagua(file, callback) {
+      const reader = new FileReader();
+      reader.onload = ev => {
         const img = new Image();
         img.onload = () => {
-          const c = document.createElement('canvas');
-          const ctx = c.getContext('2d');
-          c.width = img.width; c.height = img.height;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
-          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
           ctx.fillRect(0, img.height - 110, img.width, 110);
-          ctx.font = 'bold 35px Arial'; ctx.fillStyle = '#0f0'; ctx.textAlign = 'right';
+
+          ctx.font = 'bold 35px Arial';
+          ctx.fillStyle = '#00ff00';
+          ctx.textAlign = 'right';
           ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
-          ctx.font = '22px Arial'; ctx.fillStyle = '#fff';
+
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffffff';
           ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
-          ctx.fillStyle = '#ff0';
+
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffff00';
           ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
-          c.toBlob(b => cb(new File([b], file.name, {type:'image/jpeg'})), 'image/jpeg', 0.9);
+
+          canvas.toBlob(blob => {
+            const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
+            callback(novoArquivo);
+          }, 'image/jpeg', 0.9);
         };
-        img.src = e.target.result;
+        img.src = ev.target.result;
       };
-      r.readAsDataURL(file);
+      reader.readAsDataURL(file);
     }
 
     function tirarFoto() {
@@ -160,18 +202,30 @@
       const i = document.createElement('input');
       i.type = 'file'; i.accept = 'image/*'; i.capture = 'environment';
       i.onchange = e => {
-        const f = e.target.files[0];
-        if (!f) { document.getElementById('loading').style.display = 'none'; return; }
-        adicionarMarcaDagua(f, nf => {
+        const file = e.target.files[0];
+        if (!file) {
           document.getElementById('loading').style.display = 'none';
-          const d = document.createElement('div'); d.className = 'foto-prev';
-          const img = document.createElement('img'); img.src = URL.createObjectURL(nf);
-          img.style.width = img.style.height = '100%'; img.style.objectFit = 'cover';
-          const x = document.createElement('div'); x.textContent = 'X'; x.className = 'remover';
-          x.onclick = () => { fotos = fotos.filter(ff => ff !== nf); d.remove(); atualizarBotao(); };
-          d.appendChild(img); d.appendChild(x);
-          document.getElementById('fotos').appendChild(d);
-          fotos.push(nf);
+          return;
+        }
+        adicionarMarcaDagua(file, arquivoComMarca => {
+          document.getElementById('loading').style.display = 'none';
+          const div = document.createElement('div');
+          div.className = 'foto-prev';
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(arquivoComMarca);
+          img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+          const remover = document.createElement('div');
+          remover.textContent = 'X';
+          remover.className = 'remover';
+          remover.onclick = () => {
+            fotos = fotos.filter(f => f !== arquivoComMarca);
+            div.remove();
+            atualizarBotao();
+          };
+          div.appendChild(img);
+          div.appendChild(remover);
+          document.getElementById('fotos').appendChild(div);
+          fotos.push(arquivoComMarca);
           mostrarAdicionarMais();
         });
       };
@@ -179,12 +233,15 @@
     }
 
     function mostrarAdicionarMais() {
-      const ex = document.querySelector('.camera-actions');
-      if (ex) ex.remove();
-      const a = document.createElement('div'); a.className = 'camera-actions';
-      const b = document.createElement('button'); b.textContent = 'Adicionar Mais'; b.onclick = tirarFoto;
-      a.appendChild(b);
-      document.getElementById('fotos').appendChild(a);
+      const existente = document.querySelector('.camera-actions');
+      if (existente) existente.remove();
+      const actions = document.createElement('div');
+      actions.className = 'camera-actions';
+      const btnMais = document.createElement('button');
+      btnMais.textContent = 'Adicionar Mais';
+      btnMais.onclick = tirarFoto;
+      actions.appendChild(btnMais);
+      document.getElementById('fotos').appendChild(actions);
       atualizarBotao();
     }
 
@@ -194,46 +251,49 @@
 
     function enviar() {
       if (!placaAutorizada) return alert("Placa não autorizada!");
-      const btn = document.getElementById('env'); btn.disabled = true;
+      const envBtn = document.getElementById('env');
+      envBtn.disabled = true;
       document.getElementById('progress-container').style.display = 'block';
       document.getElementById('ok').innerHTML = "Enviando...";
-      let env = 0, total = fotos.length;
+      let enviadas = 0;
+      const total = fotos.length;
       const nota = document.getElementById('nota').value.trim();
       const motorista = document.getElementById('motorista').value.trim();
 
-      const prog = () => {
-        env++;
-        document.getElementById('progress-bar').style.width = (env/total*100)+'%';
-        if (env === total) sucesso();
+      const atualizarProgresso = () => {
+        enviadas++;
+        document.getElementById('progress-bar').style.width = (enviadas/total*100) + '%';
+        if (enviadas === total) sucesso();
       };
 
-      fotos.forEach((f, i) => {
+      fotos.forEach((foto, i) => {
         const r = new FileReader();
         r.onload = () => {
           const b = r.result.split(',')[1];
-          const dados = { 
-            acao: "enviarFoto", 
-            nota, 
-            placa: placaUsada, 
-            motorista, 
-            lat, 
-            lng, 
-            nome: `${nota}_${i+1}_${placaUsada}.jpg`, 
-            file: b 
+          const dados = {
+            acao: "enviarFoto",
+            nota: nota,
+            placa: placaUsada,
+            motorista: motorista,
+            lat: lat,
+            lng: lng,
+            nome: `${nota}_${i+1}_${placaUsada}.jpg`,
+            file: b
           };
-          fetch(URL, { 
-            method: 'POST', 
-            body: JSON.stringify(dados), 
-            mode: 'no-cors'
+          fetch(URL, {
+            method: 'POST',
+            body: JSON.stringify(dados),
+            headers: { 'Content-Type': 'text/plain' }
           })
-          .then(() => prog())
-          .catch(() => prog());
+          .then(r => r.text())
+          .then(() => atualizarProgresso())
+          .catch(() => atualizarProgresso());
         };
-        r.readAsDataURL(f);
+        r.readAsDataURL(foto);
       });
 
       function sucesso() {
-        document.getElementById('ok').innerHTML = "Enviado! Abrindo WhatsApp...";
+        document.getElementById('ok').innerHTML="Tudo enviado! Abrindo WhatsApp...";
         const msg = `Entrega ${nota} com ${total} foto(s)!\nMotorista: ${motorista}\nPlaca: ${placaUsada}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
         setTimeout(() => location.reload(), 3000);
