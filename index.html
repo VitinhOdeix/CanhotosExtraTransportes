@@ -27,7 +27,8 @@
     .spinner{border:3px solid rgba(255,255,255,0.3);border-top:3px solid white;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;margin:0 auto 10px}
     @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
     .hidden{display:none}
-    .msg{margin:15px 0;font-weight:bold}
+    .msg{margin:15px 0;font-weight:bold;color:#d00}
+    .msg.ok{color:green}
   </style>
 </head>
 <body>
@@ -99,34 +100,36 @@
       const placa = document.getElementById('placa').value.trim();
       if (!placa) return alert("Digite a placa!");
       if (!validarPlaca(placa)) return alert("Placa inválida!");
-    
-      document.getElementById('msg').innerHTML = "Verificando na planilha...";
+
+      const msg = document.getElementById('msg');
+      msg.innerHTML = "Verificando na planilha...";
+      msg.className = "msg";
       const btn = event.target;
       btn.disabled = true;
-    
+
       const dados = { acao: "verificarPlaca", placa };
-    
-      fetch('https://script.google.com/macros/s/AKfycbxC7BUdEpkhHFyriEmRM3gskf75mctueA42Zvb7bMneO7isL-1MQ9Hs9UXVWgfMNonFrg/exec', {
+
+      fetch('https://script.google.com/macros/s/AKfycbw3Kce-nUJFqTmyHvK1ZJHMFnbEqFRZmjs-VOlSeLs_LgLl7MTp-v6ZVMcCu3ZnQ0FBpA/exec', {
         method: 'POST',
         body: JSON.stringify(dados),
-        headers: { 'Content-Type': 'application/json' }, // CORRIGIDO AQUI
-        mode: 'no-cors'
+        headers: { 'Content-Type': 'application/json' }
       })
-      .then(r => r.text())
-      .then(t => {
+      .then(r => r.json())
+      .then(data => {
         btn.disabled = false;
-        if (t === "OK") {
+        if (data.status === "OK") {
           placaAutorizada = true;
           placaUsada = placa;
-          document.getElementById('msg').innerHTML = "Placa autorizada! Preencha os dados.";
+          msg.innerHTML = "Placa autorizada! Preencha os dados.";
+          msg.className = "msg ok";
           document.getElementById('app').classList.remove('hidden');
         } else {
-          document.getElementById('msg').innerHTML = t;
+          msg.innerHTML = data.message || "Placa não encontrada";
         }
       })
-      .catch(() => {
+      .catch(err => {
         btn.disabled = false;
-        document.getElementById('msg').innerHTML = "Erro de conexão. Tente novamente.";
+        msg.innerHTML = "Erro de conexão: " + err.message;
       });
     }
 
@@ -204,7 +207,7 @@
           img.src = URL.createObjectURL(arquivoComMarca);
           img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
           const remover = document.createElement('div');
-          remover.textContent = '×';
+          remover.textContent = 'X';
           remover.className = 'remover';
           remover.onclick = () => {
             fotos = fotos.filter(f => f !== arquivoComMarca);
@@ -269,13 +272,13 @@
             nome: `${nota}_${i+1}_${placaUsada}.jpg`,
             file: b
           };
-          fetch('https://script.google.com/macros/s/AKfycbxC7BUdEpkhHFyriEmRM3gskf75mctueA42Zvb7bMneO7isL-1MQ9Hs9UXVWgfMNonFrg/exec', {
+          fetch('https://script.google.com/macros/s/AKfycbw3Kce-nUJFqTmyHvK1ZJHMFnbEqFRZmjs-VOlSeLs_LgLl7MTp-v6ZVMcCu3ZnQ0FBpA/exec', {
             method: 'POST',
             body: JSON.stringify(dados),
-            headers: {'Content-Type': 'text/plain'},
-            mode: 'no-cors'
-          }).then(() => atualizarProgresso())
-            .catch(() => atualizarProgresso());
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .then(() => atualizarProgresso())
+          .catch(() => atualizarProgresso());
         };
         r.readAsDataURL(foto);
       });
