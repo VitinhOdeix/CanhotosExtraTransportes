@@ -17,19 +17,13 @@
     #progress-bar{height:100%;width:0;background:#007bff;transition:width 0.3s}
     #ok{margin-top:15px;font-weight:bold;color:green}
     h2{color:#007bff}
-    h3{color:#007bff;font-size:20px}
     .camera-actions{width:90%;margin:10px auto 0;display:flex;justify-content:center;gap:10px}
     .camera-actions button{width:100%;padding:14px;font-size:16px;margin:0}
-    .erro{color:#dc3545}
-    .sucesso{color:#28a745}
-    #placa-verificacao{margin-bottom:10px}
 
-    /* FOTO DE EXEMPLO */
     .obs p{font-size:14px;line-height:1.5;margin:10px 0}
     .exemplo-container{width:90%;max-width:400px;margin:20px auto;border:2px dashed #007bff;border-radius:12px;overflow:hidden;background:#f0f8ff;padding:10px;box-sizing:border-box}
     .exemplo-img{width:100%;height:auto;max-height:300px;object-fit:contain;border-radius:8px;display:block;margin:0 auto}
 
-    /* LOADING */
     #loading{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,123,255,0.9);color:white;padding:20px;border-radius:10px;font-size:16px;z-index:9999;text-align:center}
     .spinner{border:3px solid rgba(255,255,255,0.3);border-top:3px solid white;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;margin:0 auto 10px}
     @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
@@ -40,33 +34,23 @@
     <img src="logo.png" alt="Extra Transportes" class="logo" onerror="this.style.display='none'">
     <h2>Comprovante de Entrega</h2>
 
-    <div id="tela-verificacao">
-      <h3>Verificação de Acesso</h3>
-      <p style="font-size:14px;color:#666;margin:15px 0">Insira a placa do veículo para verificar autorização:</p>
-      <input type="text" id="placa-verificacao" placeholder="Placa (ex: ABC1D23)" maxlength="7" required>
-      <button onclick="verificarPlaca()">Verificar Placa</button>
-      <p id="mensagem-verificacao" style="margin-top:15px;font-weight:bold"></p>
-    </div>
-
-    <div id="tela-formulario" style="display:none">
-      <div class="obs">
-        <p>⚠️ Fotos devem ser nítidas e bem iluminadas.<br>
-        ⚠️ Fotos não Legíveis serão solicitadas novamente.<br>
-        ⚠️ O site pedirá permissões — clique em "Permitir" para continuar.</p>
-        <div class="exemplo-container">
-          <img src="exemplo.jpg" alt="Foto de exemplo" class="exemplo-img" onerror="this.style.display='none'">
-        </div>
+    <div class="obs">
+      <p>Fotos devem ser nítidas e bem iluminadas.<br>
+      Fotos não Legíveis serão solicitadas novamente.<br>
+      O site pedirá permissões — clique em "Permitir" para continuar.</p>
+      <div class="exemplo-container">
+        <img src="exemplo.jpg" alt="Foto de exemplo" class="exemplo-img" onerror="this.style.display='none'">
       </div>
-
-      <input type="text" id="motorista" placeholder="Nome do Motorista" required>
-      <input type="text" id="nota" placeholder="Número da Nota/CT-e" required>
-      <input type="text" id="placa" placeholder="Placa" readonly required>
-      <button onclick="iniciar()">Iniciar Comprovante</button>
-      <div class="fotos" id="fotos"></div>
-      <div id="progress-container"><div id="progress-bar"></div></div>
-      <button onclick="enviar()" id="env" style="display:none">Enviar para Transportadora</button>
-      <p id="ok"></p>
     </div>
+
+    <input type="text" id="placa" placeholder="Placa (ex: ABC1D23)" maxlength="7">
+    <input type="text" id="motorista" placeholder="Nome do Motorista" disabled>
+    <input type="text" id="nota" placeholder="Número da Nota/CT-e" disabled>
+    <button onclick="iniciar()" id="btnIniciar" style="display:none">Iniciar Comprovante</button>
+    <div class="fotos" id="fotos" style="display:none"></div>
+    <div id="progress-container"><div id="progress-bar"></div></div>
+    <button onclick="enviar()" id="env" style="display:none">Enviar para Transportadora</button>
+    <p id="ok"></p>
   </div>
 
   <div id="loading">
@@ -75,69 +59,86 @@
   </div>
 
   <script>
-    let fotos = [], lat = null, lng = null, gpsPronto = false, placaVerificada = false;
-    let placasAutorizadas = [];
+    let fotos = [], lat = null, lng = null, gpsPronto = false;
+    let placaValida = false;
 
-    const SCRIPT_VERIFICACAO = 'https://script.google.com/macros/s/AKfycbyDI1t7cpAO2iqLJt6WFraA0W42E92-D6l6ZGrLR5U3Y7Av0tXJ-tOacOFwQTpk2lbT7w/exec';
+    const inputPlaca = document.getElementById('placa');
+    const inputMotorista = document.getElementById('motorista');
+    const inputNota = document.getElementById('nota');
+    const btnIniciar = document.getElementById('btnIniciar');
+    const containerFotos = document.getElementById('fotos');
+    const btnEnviar = document.getElementById('env');
+    const okMsg = document.getElementById('ok');
 
-    document.getElementById('placa-verificacao').addEventListener('input', function(e) {
+    // SEU NOVO LINK (ATUALIZADO!)
+    const URL_VERIFICACAO_PLACAS = 'https://script.google.com/macros/s/AKfycbzE4Lsz2QW_tXhyWu41cKFWkzamny4QDUrJLVBXB1OQmXRjBrkFTeQuSskUoWX57B4w/exec';
+    const URL_SALVAR_ENTREGA = 'https://script.google.com/macros/s/AKfycbwXF_DHm3SIbHQEtkaaqtbF94bHxRSgwSDNhH4_VYuDQ-4TBOd17zoSMCUnxkOYoRDvVg/exec';
+
+    function bloquearFormulario() {
+      inputMotorista.disabled = true;
+      inputNota.disabled = true;
+      btnIniciar.disabled = true;
+      btnIniciar.style.display = 'none';
+      containerFotos.style.display = 'none';
+      btnEnviar.style.display = 'none';
+    }
+
+    function liberarFormulario() {
+      inputMotorista.disabled = false;
+      inputNota.disabled = false;
+      btnIniciar.disabled = false;
+      btnIniciar.style.display = 'block';
+      containerFotos.style.display = 'block';
+      okMsg.innerHTML = '<span style="color:green">Placa válida! Preencha os dados.</span>';
+    }
+
+    bloquearFormulario();
+
+    inputPlaca.addEventListener('input', function(e) {
       let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (v.length > 7) v = v.slice(0,7);
       e.target.value = v;
-    });
 
-    async function carregarPlacasAutorizadas() {
-      try {
-        const response = await fetch(SCRIPT_VERIFICACAO);
-        const data = await response.json();
-        if (data.placas) {
-          placasAutorizadas = data.placas;
-        }
-      } catch (error) {
-        console.error('Erro ao carregar placas:', error);
-      }
-    }
-
-    function verificarPlaca() {
-      const placaInput = document.getElementById('placa-verificacao').value.trim();
-      const mensagem = document.getElementById('mensagem-verificacao');
-
-      if (!placaInput) {
-        mensagem.textContent = '';
-        return;
-      }
-
-      if (!validarPlaca(placaInput)) {
-        mensagem.textContent = 'Placa inválida! Use ABC1D23 ou ABC1234';
-        mensagem.className = 'erro';
-        placaVerificada = false;
-        return;
-      }
-
-      if (placasAutorizadas.includes(placaInput)) {
-        mensagem.textContent = 'Placa autorizada! Clique em "Continuar" para prosseguir.';
-        mensagem.className = 'sucesso';
-        placaVerificada = true;
-        mostrarTelaFormulario(placaInput);
+      if (v.length === 7 && validarPlaca(v)) {
+        verificarPlacaNoGoogleSheets(v);
       } else {
-        mensagem.textContent = 'Placa não autorizada. Acesso bloqueado.';
-        mensagem.className = 'erro';
-        placaVerificada = false;
+        bloquearFormulario();
+        okMsg.innerHTML = '';
+        placaValida = false;
       }
-    }
-
-    function mostrarTelaFormulario(placa) {
-      document.getElementById('tela-verificacao').style.display = 'none';
-      document.getElementById('tela-formulario').style.display = 'block';
-      document.getElementById('placa').value = placa;
-    }
-
-    carregarPlacasAutorizadas();
+    });
 
     function validarPlaca(placa) {
       const padrao1 = /^[A-Z]{3}\d[A-Z]\d{2}$/;
       const padrao2 = /^[A-Z]{3}\d{4}$/;
       return padrao1.test(placa) || padrao2.test(placa);
+    }
+
+    function verificarPlacaNoGoogleSheets(placa) {
+      okMsg.innerHTML = '<span style="color:#007bff">Verificando placa...</span>';
+      
+      fetch(URL_VERIFICACAO_PLACAS)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            okMsg.innerHTML = `<span style="color:red">Erro: ${data.error}</span>`;
+            bloquearFormulario();
+            return;
+          }
+          if (data.placas && data.placas.includes(placa)) {
+            placaValida = true;
+            liberarFormulario();
+          } else {
+            placaValida = false;
+            bloquearFormulario();
+            okMsg.innerHTML = '<span style="color:red">Placa não autorizada!</span>';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          okMsg.innerHTML = '<span style="color:red">Erro de conexão. Tente novamente.</span>';
+          bloquearFormulario();
+        });
     }
 
     function formatarDataHora() {
@@ -151,11 +152,10 @@
     }
 
     function iniciar() {
-      const motorista = document.getElementById('motorista').value.trim();
-      const n = document.getElementById('nota').value.trim();
-      const placa = document.getElementById('placa').value.trim();
-      if (!motorista || !n || !placa) return alert("Preencha todos os campos!");
-      if (!validarPlaca(placa)) return alert("Placa inválida! Use ABC1D23 ou ABC1234");
+      if (!placaValida) return alert("Placa não validada!");
+      const motorista = inputMotorista.value.trim();
+      const n = inputNota.value.trim();
+      if (!motorista || !n) return alert("Preencha todos os campos!");
 
       if (!gpsPronto) {
         if (!navigator.geolocation) return alert("GPS não disponível");
@@ -181,22 +181,18 @@
           canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
     
-          // Fundo semi-transparente
           ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
           ctx.fillRect(0, img.height - 110, img.width, 110);
     
-          // ENTREGUE
           ctx.font = 'bold 35px Arial';
           ctx.fillStyle = '#00ff00';
           ctx.textAlign = 'right';
           ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
     
-          // Data e hora
           ctx.font = '22px Arial';
           ctx.fillStyle = '#ffffff';
           ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
     
-          // GPS
           ctx.font = '22px Arial';
           ctx.fillStyle = '#ffff00';
           ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
@@ -260,20 +256,20 @@
     }
 
     function atualizarBotao() {
-      document.getElementById('env').style.display = fotos.length > 0 ? 'block' : 'none';
+      btnEnviar.style.display = fotos.length > 0 ? 'block' : 'none';
     }
 
     function enviar(){
       const envBtn = document.getElementById('env');
       envBtn.disabled = true;
       document.getElementById('progress-container').style.display = 'block';
-      document.getElementById('ok').innerHTML = "Enviando...";
+      okMsg.innerHTML = "Enviando...";
       let enviadas = 0;
       const total = fotos.length;
 
-      const nota = document.getElementById('nota').value.trim();
-      const placa = document.getElementById('placa').value.trim();
-      const motorista = document.getElementById('motorista').value.trim();
+      const nota = inputNota.value.trim();
+      const placa = inputPlaca.value.trim();
+      const motorista = inputMotorista.value.trim();
 
       const atualizarProgresso = () => {
         enviadas++;
@@ -295,7 +291,7 @@
             file: b
           };
 
-          fetch('https://script.google.com/macros/s/AKfycbwXF_DHm3SIbHQEtkaaqtbF94bHxRSgwSDNhH4_VYuDQ-4TBOd17zoSMCUnxkOYoRDvVg/exec', {
+          fetch(URL_SALVAR_ENTREGA, {
             method: 'POST',
             body: JSON.stringify(dados),
             headers: {'Content-Type': 'text/plain'},
@@ -307,7 +303,7 @@
       });
 
       function sucesso() {
-        document.getElementById('ok').innerHTML="Tudo enviado! Abrindo WhatsApp...";
+        okMsg.innerHTML="Tudo enviado! Abrindo WhatsApp...";
         const msg = `Entrega ${nota} com ${total} foto(s)!\nMotorista: ${motorista}\nPlaca: ${placa}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
         setTimeout(() => location.reload(), 3000);
