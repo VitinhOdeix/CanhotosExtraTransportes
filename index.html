@@ -152,21 +152,36 @@
     }
 
     function iniciar() {
-      if (!placaValida) return alert("Placa não validada!");
+      btnIniciar.disabled = true; // Desabilita botão ao clicar
+      if (!placaValida) {
+        btnIniciar.disabled = false; // Reabilita em caso de erro imediato
+        return alert("Placa não validada!");
+      }
       const motorista = inputMotorista.value.trim();
       const n = inputNota.value.trim();
-      if (!motorista || !n) return alert("Preencha todos os campos!");
+      if (!motorista || !n) {
+        btnIniciar.disabled = false; // Reabilita
+        return alert("Preencha todos os campos!");
+      }
 
       if (!gpsPronto) {
-        if (!navigator.geolocation) return alert("GPS não disponível");
+        if (!navigator.geolocation) {
+          btnIniciar.disabled = false; // Reabilita
+          return alert("GPS não disponível");
+        }
         navigator.geolocation.getCurrentPosition(pos => {
           lat = pos.coords.latitude.toFixed(6);
           lng = pos.coords.longitude.toFixed(6);
           gpsPronto = true;
           tirarFoto();
-        }, () => alert("Permita o GPS!"));
+          btnIniciar.disabled = false; // Reabilita após sucesso
+        }, () => {
+          btnIniciar.disabled = false; // Reabilita em erro
+          alert("Permita o GPS!");
+        });
       } else {
         tirarFoto();
+        btnIniciar.disabled = false; // Reabilita
       }
     }
 
@@ -208,6 +223,11 @@
     }
 
     function tirarFoto() {
+      // Desabilita botões relacionados (Iniciar e Adicionar Mais, se existirem)
+      btnIniciar.disabled = true;
+      const btnMais = document.querySelector('.camera-actions button');
+      if (btnMais) btnMais.disabled = true;
+
       document.getElementById('loading').style.display = 'block';
       const i = document.createElement('input');
       i.type = 'file'; i.accept = 'image/*'; i.capture = 'environment';
@@ -215,6 +235,8 @@
         const file = e.target.files[0];
         if (!file) {
           document.getElementById('loading').style.display = 'none';
+          btnIniciar.disabled = false;
+          if (btnMais) btnMais.disabled = false;
           return;
         }
         adicionarMarcaDagua(file, arquivoComMarca => {
@@ -237,6 +259,8 @@
           document.getElementById('fotos').appendChild(div);
           fotos.push(arquivoComMarca);
           mostrarAdicionarMais();
+          btnIniciar.disabled = false;
+          if (btnMais) btnMais.disabled = false; // Reabilita após sucesso
         });
       };
       i.click();
@@ -267,16 +291,13 @@
       let enviadas = 0;
       const total = fotos.length;
 
-      const nota = inputNota.value.trim();
-      const placa = inputPlaca.value.trim();
-      const motorista = inputMotorista.value.trim();
-
       const atualizarProgresso = () => {
         enviadas++;
         document.getElementById('progress-bar').style.width = (enviadas/total*100) + '%';
         if (enviadas === total) sucesso();
       };
 
+      let erro = false;
       fotos.forEach((foto, i) => {
         const r = new FileReader();
         r.onload = () => {
@@ -297,16 +318,25 @@
             headers: {'Content-Type': 'text/plain'},
             mode: 'no-cors'
           }).then(() => atualizarProgresso())
-            .catch(() => atualizarProgresso());
+            .catch(() => {
+              erro = true;
+              atualizarProgresso();
+            });
         };
         r.readAsDataURL(foto);
       });
 
       function sucesso() {
-        okMsg.innerHTML="Tudo enviado! Abrindo WhatsApp...";
-        const msg = `Entrega ${nota} com ${total} foto(s)!\nMotorista: ${motorista}\nPlaca: ${placa}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-        setTimeout(() => location.reload(), 3000);
+        if (erro) {
+          okMsg.innerHTML = "<span style='color:red'>Erro ao enviar. Tente novamente.</span>";
+          document.getElementById('progress-container').style.display = 'none';
+          envBtn.disabled = false; // Reabilita em caso de erro
+        } else {
+          okMsg.innerHTML="Tudo enviado! Abrindo WhatsApp...";
+          const msg = `Entrega ${nota} com ${total} foto(s)!\nMotorista: ${motorista}\nPlaca: ${placa}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
+          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+          setTimeout(() => location.reload(), 3000);
+        }
       }
     }
   </script>
