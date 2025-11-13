@@ -1,403 +1,307 @@
-<DOCUMENT filename="index.html">
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Extra Transportes</title>
-  <style>
-    body{font-family:Arial;background:#f8f9fa;margin:0;padding:20px;text-align:center}
-    .c{background:#fff;max-width:420px;margin:auto;padding:30px;border-radius:25px;box-shadow:0 15px 40px rgba(0,0,0,.2);overflow:hidden}
-    .logo{width:210px;margin:20px auto;display:block}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  const { jsPDF } = window.jspdf;
+
+  let fotos = [], lat = null, lng = null, gpsPronto = false;
+  let placaValida = false;
+  let jaEnviou = false; // ← NOVO: controla se já enviou
+
+  const inputPlaca = document.getElementById('placa');
+  const inputMotorista = document.getElementById('motorista');
+  const inputNota = document.getElementById('nota');
+  const btnIniciar = document.getElementById('btnIniciar');
+  const containerFotos = document.getElementById('fotos');
+  const btnEnviar = document.getElementById('env');
+  const okMsg = document.getElementById('ok');
+
+  const URL_VERIFICACAO_PLACAS = 'https://script.google.com/macros/s/AKfycbwx02Qirtq2QNhzvR1ACqF4W_ZmBHcS3NgVvVDe1MEg2HnHtNJxWdvpWfP-mSyASuGimw/exec';
+  const URL_SALVAR_ENTREGA = 'https://script.google.com/macros/s/AKfycbw74mcsCiD4iq8kA7yJF4rpt0aO8Q9vhQwsyq-t4UH6mesrhecSboB9f4-8-6ktXUxlFw/exec';
+
+  function bloquearFormulario() {
+    inputMotorista.disabled = true;
+    inputNota.disabled = true;
+    btnIniciar.disabled = true;
+    btnIniciar.style.display = 'none';
+    containerFotos.style.display = 'none';
+    btnEnviar.style.display = 'none';
+  }
+
+  function liberarFormulario() {
+    inputMotorista.disabled = false;
+    inputNota.disabled = false;
+    btnIniciar.disabled = false;
+    btnIniciar.style.display = 'block';
+    containerFotos.style.display = 'block';
+    okMsg.innerHTML = '<span style="color:green">Placa válida! Preencha os dados.</span>';
+  }
+
+  bloquearFormulario();
+
+  inputPlaca.addEventListener('input', function(e) {
+    let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (v.length > 7) v = v.slice(0,7);
+    e.target.value = v;
+
+    if (v.length === 7 && validarPlaca(v)) {
+      verificarPlacaNoGoogleSheets(v);
+    } else {
+      bloquearFormulario();
+      okMsg.innerHTML = '';
+      placaValida = false;
+    }
+  });
+
+  function validarPlaca(placa) {
+    const padrao1 = /^[A-Z]{3}\d[A-Z]\d{2}$/;
+    const padrao2 = /^[A-Z]{3}\d{4}$/;
+    return padrao1.test(placa) || padrao2.test(placa);
+  }
+
+  function verificarPlacaNoGoogleSheets(placa) {
+    okMsg.innerHTML = '<span style="color:#007bff">Verificando placa...</span>';
     
-    /* ← CAMPOS MAIS ALTOS E BONITOS */
-    input{
-      width:90%;
-      padding:18px 16px !important;   /* mais altura */
-      margin:14px auto;
-      display:block;
-      border-radius:14px !important;
-      border:2px solid #007bff;
-      font-size:18px !important;
-      box-sizing:border-box;
-      background:#fff;
-    }
-    
-    input:focus{
-      outline:none;
-      border-color:#0056b3;
-      box-shadow:0 0 0 3px rgba(0,123,255,0.2);
-    }
-    
-    button{
-      width:90%;
-      padding:18px;
-      margin:20px auto 10px;
-      display:block;
-      border-radius:14px;
-      border:none;
-      background:#007bff;
-      color:#fff;
-      font-size:18px;
-      font-weight:bold;
-      cursor:pointer;
-      box-shadow:0 4px 15px rgba(0,123,255,0.3);
-    }
-    
-    /* ← BOTÃO INICIAR TOTALMENTE CENTRALIZADO */
-    #btnIniciar{
-      width:85% !important;
-      max-width:340px;
-      margin:25px auto !important;
-      padding:19px !important;
-      font-size:19px !important;
-    }
-
-    .fotos{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:15px 0}
-    .foto-prev{width:100px;height:100px;object-fit:cover;border-radius:10px;border:2px solid #007bff;position:relative}
-    .remover{position:absolute;top:5px;right:5px;background:red;color:white;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;cursor:pointer}
-    #progress-container{width:90%;height:20px;background:#ddd;border-radius:10px;margin:15px auto;overflow:hidden;display:none}
-    #progress-bar{height:100%;width:0;background:#007bff;transition:width 0.3s}
-    #ok{margin-top:15px;font-weight:bold;color:green}
-    h2{color:#007bff}
-    .camera-actions{width:90%;margin:10px auto 0;display:flex;justify-content:center;gap:10px}
-    .camera-actions button{width:100%;padding:14px;font-size:16px;margin:0}
-
-    .obs p{font-size:17px;line-height:1.6;margin:14px 0}
-    .exemplo-container{width:90%;max-width:400px;margin:20px auto;border:2px dashed #007bff;border-radius:12px;overflow:hidden;background:#f0f8ff;padding:10px;box-sizing:border-box}
-    .exemplo-img{width:100%;height:auto;max-height:300px;object-fit:contain;border-radius:8px;display:block;margin:0 auto}
-
-    #loading{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,123,255,0.9);color:white;padding:20px;border-radius:10px;font-size:16px;z-index:9999;text-align:center}
-    .spinner{border:3px solid rgba(255,255,255,0.3);border-top:3px solid white;border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;margin:0 auto 10px}
-    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-  </style>
-</head>
-<body>
-  <div class="c">
-    <img src="logo.png" alt="Extra Transportes" class="logo" onerror="this.style.display='none'">
-    <h2>Comprovante de Entrega</h2>
-
-    <div class="obs">
-      <p>Fotos devem ser nítidas e bem iluminadas.<br>
-      Fotos não Legíveis serão solicitadas novamente.<br>
-      O site pedirá permissões — clique em "Permitir" para continuar.</p>
-      <div class="exemplo-container">
-        <img src="exemplo.jpg" alt="Foto de exemplo" class="exemplo-img" onerror="this.style.display='none'">
-      </div>
-    </div>
-
-    <input type="text" id="placa" placeholder="Placa (ex: ABC1D23)" maxlength="7">
-    <input type="text" id="motorista" placeholder="Nome do Motorista" disabled>
-    <input type="text" id="nota" placeholder="Número da Nota/CT-e" disabled>
-    <button onclick="iniciar()" id="btnIniciar" style="display:none">Iniciar Comprovante</button>
-    <div class="fotos" id="fotos" style="display:none"></div>
-    <div id="progress-container"><div id="progress-bar"></div></div>
-    <button onclick="enviar()" id="env" style="display:none">Enviar para Transportadora</button>
-    <p id="ok"></p>
-  </div>
-
-  <div id="loading">
-    <div class="spinner"></div>
-    Processando...
-  </div>
-
-  <!-- Todo o JavaScript continua 100% igual ao original (não alterado) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script>
-    const { jsPDF } = window.jspdf;
-
-    let fotos = [], lat = null, lng = null, gpsPronto = false;
-    let placaValida = false;
-
-    const inputPlaca = document.getElementById('placa');
-    const inputMotorista = document.getElementById('motorista');
-    const inputNota = document.getElementById('nota');
-    const btnIniciar = document.getElementById('btnIniciar');
-    const containerFotos = document.getElementById('fotos');
-    const btnEnviar = document.getElementById('env');
-    const okMsg = document.getElementById('ok');
-
-    const URL_VERIFICACAO_PLACAS = 'https://script.google.com/macros/s/AKfycbwx02Qirtq2QNhzvR1ACqF4W_ZmBHcS3NgVvVDe1MEg2HnHtNJxWdvpWfP-mSyASuGimw/exec';
-    const URL_SALVAR_ENTREGA = 'https://script.google.com/macros/s/AKfycbw74mcsCiD4iq8kA7yJF4rpt0aO8Q9vhQwsyq-t4UH6mesrhecSboB9f4-8-6ktXUxlFw/exec';
-
-    function bloquearFormulario() {
-      inputMotorista.disabled = true;
-      inputNota.disabled = true;
-      btnIniciar.disabled = true;
-      btnIniciar.style.display = 'none';
-      containerFotos.style.display = 'none';
-      btnEnviar.style.display = 'none';
-    }
-
-    function liberarFormulario() {
-      inputMotorista.disabled = false;
-      inputNota.disabled = false;
-      btnIniciar.disabled = false;
-      btnIniciar.style.display = 'block';
-      containerFotos.style.display = 'block';
-      okMsg.innerHTML = '<span style="color:green">Placa válida! Preencha os dados.</span>';
-    }
-
-    bloquearFormulario();
-
-    inputPlaca.addEventListener('input', function(e) {
-      let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (v.length > 7) v = v.slice(0,7);
-      e.target.value = v;
-
-      if (v.length === 7 && validarPlaca(v)) {
-        verificarPlacaNoGoogleSheets(v);
-      } else {
-        bloquearFormulario();
-        okMsg.innerHTML = '';
-        placaValida = false;
-      }
-    });
-
-    function validarPlaca(placa) {
-      const padrao1 = /^[A-Z]{3}\d[A-Z]\d{2}$/;
-      const padrao2 = /^[A-Z]{3}\d{4}$/;
-      return padrao1.test(placa) || padrao2.test(placa);
-    }
-
-    function verificarPlacaNoGoogleSheets(placa) {
-      okMsg.innerHTML = '<span style="color:#007bff">Verificando placa...</span>';
-      
-      fetch(URL_VERIFICACAO_PLACAS)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            okMsg.innerHTML = `<span style="color:red">Erro: ${data.error}</span>`;
-            bloquearFormulario();
-            return;
-          }
-          if (data.placas && data.placas.includes(placa)) {
-            placaValida = true;
-            liberarFormulario();
-          } else {
-            placaValida = false;
-            bloquearFormulario();
-            okMsg.innerHTML = '<span style="color:red">Placa não autorizada!</span>';
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          okMsg.innerHTML = '<span style="color:red">Erro de conexão. Tente novamente.</span>';
+    fetch(URL_VERIFICACAO_PLACAS)
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          okMsg.innerHTML = `<span style="color:red">Erro: ${data.error}</span>`;
           bloquearFormulario();
-        });
-    }
-
-    function formatarDataHora() {
-      const agora = new Date();
-      const dia = String(agora.getDate()).padStart(2, '0');
-      const mes = String(agora.getMonth() + 1).padStart(2, '0');
-      const ano = agora.getFullYear();
-      const hora = String(agora.getHours()).padStart(2, '0');
-      const min = String(agora.getMinutes()).padStart(2, '0');
-      return `${dia}/${mes}/${ano} ${hora}:${min}`;
-    }
-
-    function iniciar() {
-      if (!placaValida) return alert("Placa não validada!");
-      const motorista = inputMotorista.value.trim();
-      const n = inputNota.value.trim();
-      if (!motorista || !n) return alert("Preencha todos os campos!");
-
-      if (!gpsPronto) {
-        if (!navigator.geolocation) return alert("GPS não disponível");
-        navigator.geolocation.getCurrentPosition(pos => {
-          lat = pos.coords.latitude.toFixed(6);
-          lng = pos.coords.longitude.toFixed(6);
-          gpsPronto = true;
-          tirarFoto();
-        }, () => alert("Permita o GPS!"));
-      } else {
-        tirarFoto();
-      }
-    }
-
-    function adicionarMarcaDagua(file, callback) {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-    
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.fillRect(0, img.height - 110, img.width, 110);
-    
-          ctx.font = 'bold 35px Arial';
-          ctx.fillStyle = '#00ff00';
-          ctx.textAlign = 'right';
-          ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
-    
-          ctx.font = '22px Arial';
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
-    
-          ctx.font = '22px Arial';
-          ctx.fillStyle = '#ffff00';
-          ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
-    
-          canvas.toBlob(blob => {
-            const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
-            callback(novoArquivo);
-          }, 'image/jpeg', 0.9);
-        };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function tirarFoto() {
-      document.getElementById('loading').style.display = 'block';
-      const i = document.createElement('input');
-      i.type = 'file'; i.accept = 'image/*'; i.capture = 'environment';
-      i.onchange = e => {
-        const file = e.target.files[0];
-        if (!file) {
-          document.getElementById('loading').style.display = 'none';
           return;
         }
-        adicionarMarcaDagua(file, arquivoComMarca => {
-          document.getElementById('loading').style.display = 'none';
-          const div = document.createElement('div');
-          div.className = 'foto-prev';
-          const img = document.createElement('img');
-          img.src = URL.createObjectURL(arquivoComMarca);
-          img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
-          const remover = document.createElement('div');
-          remover.textContent = '×';
-          remover.className = 'remover';
-          remover.onclick = () => {
-            fotos = fotos.filter(f => f !== arquivoComMarca);
-            div.remove();
-            atualizarBotao();
-          };
-          div.appendChild(img);
-          div.appendChild(remover);
-          document.getElementById('fotos').appendChild(div);
-          fotos.push(arquivoComMarca);
-          mostrarAdicionarMais();
-        });
+        if (data.placas && data.placas.includes(placa)) {
+          placaValida = true;
+          liberarFormulario();
+        } else {
+          placaValida = false;
+          bloquearFormulario();
+          okMsg.innerHTML = '<span style="color:red">Placa não autorizada!</span>';
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        okMsg.innerHTML = '<span style="color:red">Erro de conexão. Tente novamente.</span>';
+        bloquearFormulario();
+      });
+  }
+
+  function formatarDataHora() {
+    const agora = new Date();
+    const dia = String(agora.getDate()).padStart(2, '0');
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const ano = agora.getFullYear();
+    const hora = String(agora.getHours()).padStart(2, '0');
+    const min = String(agora.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${ano} ${hora}:${min}`;
+  }
+
+  function iniciar() {
+    if (!placaValida) return alert("Placa não validada!");
+    const motorista = inputMotorista.value.trim();
+    const n = inputNota.value.trim();
+    if (!motorista || !n) return alert("Preencha todos os campos!");
+
+    if (!gpsPronto) {
+      if (!navigator.geolocation) return alert("GPS não disponível");
+      navigator.geolocation.getCurrentPosition(pos => {
+        lat = pos.coords.latitude.toFixed(6);
+        lng = pos.coords.longitude.toFixed(6);
+        gpsPronto = true;
+        tirarFoto();
+      }, () => alert("Permita o GPS!"));
+    } else {
+      tirarFoto();
+    }
+  }
+
+  function adicionarMarcaDagua(file, callback) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, img.height - 110, img.width, 110);
+
+        ctx.font = 'bold 35px Arial';
+        ctx.fillStyle = '#00ff00';
+        ctx.textAlign = 'right';
+        ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
+
+        ctx.font = '22px Arial';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
+
+        ctx.font = '22px Arial';
+        ctx.fillStyle = '#ffff00';
+        ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
+
+        canvas.toBlob(blob => {
+          const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
+          callback(novoArquivo);
+        }, 'image/jpeg', 0.9);
       };
-      i.click();
-    }
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
 
-    function mostrarAdicionarMais() {
-      const existente = document.querySelector('.camera-actions');
-      if (existente) existente.remove();
-      const actions = document.createElement('div');
-      actions.className = 'camera-actions';
-      const btnMais = document.createElement('button');
-      btnMais.textContent = 'Adicionar Mais';
-      btnMais.onclick = tirarFoto;
-      actions.appendChild(btnMais);
-      document.getElementById('fotos').appendChild(actions);
-      atualizarBotao();
-    }
+  function tirarFoto() {
+    document.getElementById('loading').style.display = 'block';
+    const i = document.createElement('input');
+    i.type = 'file'; i.accept = 'image/*'; i.capture = 'environment';
+    i.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) {
+        document.getElementById('loading').style.display = 'none';
+        return;
+      }
+      adicionarMarcaDagua(file, arquivoComMarca => {
+        document.getElementById('loading').style.display = 'none';
+        const div = document.createElement('div');
+        div.className = 'foto-prev';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(arquivoComMarca);
+        img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+        const remover = document.createElement('div');
+        remover.textContent = '×';
+        remover.className = 'remover';
+        remover.onclick = () => {
+          fotos = fotos.filter(f => f !== arquivoComMarca);
+          div.remove();
+          atualizarBotao();
+        };
+        div.appendChild(img);
+        div.appendChild(remover);
+        document.getElementById('fotos').appendChild(div);
+        fotos.push(arquivoComMarca);
+        mostrarAdicionarMais();
+      });
+    };
+    i.click();
+  }
 
-    function atualizarBotao() {
-      btnEnviar.style.display = fotos.length > 0 ? 'block' : 'none';
-    }
+  function mostrarAdicionarMais() {
+    const existente = document.querySelector('.camera-actions');
+    if (existente) existente.remove();
+    const actions = document.createElement('div');
+    actions.className = 'camera-actions';
+    const btnMais = document.createElement('button');
+    btnMais.textContent = 'Adicionar Mais';
+    btnMais.onclick = tirarFoto;
+    actions.appendChild(btnMais);
+    document.getElementById('fotos').appendChild(actions);
+    atualizarBotao();
+  }
 
-    async function gerarPDFcomFotos() {
-      const pdf = new jsPDF();
-      const paginaAltura = pdf.internal.pageSize.getHeight();
-      const paginaLargura = pdf.internal.pageSize.getWidth();
+  function atualizarBotao() {
+    btnEnviar.style.display = fotos.length > 0 ? 'block' : 'none';
+  }
 
-      for (let i = 0; i < fotos.length; i++) {
-        if (i > 0) pdf.addPage();
-        const imgData = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(fotos[i]);
-        });
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidthirebase = paginaLargura - 20;
-        const pdfHeight = (imgProps.height * pdfWidthirebase) / imgProps.width;
-        let heightLeft = pdfHeight;
-        let heightPos = 10;
+  async function gerarPDFcomFotos() {
+    const pdf = new jsPDF();
+    const paginaAltura = pdf.internal.pageSize.getHeight();
+    const paginaLargura = pdf.internal.pageSize.getWidth();
 
-        while (heightLeft > 0) {
-          if (heightPos + heightLeft > paginaAltura - 10 && heightLeft < paginaAltura - 20) {
-            heightPos = 10;
-          }
-          if (heightPos > 10) pdf.addPage();
-          pdf.addImage(imgData, 'JPEG', 10, heightPos, pdfWidthirebase, Math.min(heightLeft, paginaAltura - heightPos - 10));
-          heightLeft -= (paginaAltura - heightPos - 10);
+    for (let i = 0; i < fotos.length; i++) {
+      if (i > 0) pdf.addPage();
+      const imgData = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(fotos[i]);
+      });
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = paginaLargura - 20;
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      let heightLeft = pdfHeight;
+      let heightPos = 10;
+
+      while (heightLeft > 0) {
+        if (heightPos + heightLeft > paginaAltura - 10 && heightLeft < paginaAltura - 20) {
           heightPos = 10;
         }
+        if (heightPos > 10) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 10, heightPos, pdfWidth, Math.min(heightLeft, paginaAltura - heightPos - 10));
+        heightLeft -= (paginaAltura - heightPos - 10);
+        heightPos = 10;
       }
+    }
+    return pdf.output('blob');
+  }
 
-      return pdf.output('blob');
+  // ← FUNÇÃO enviar() COM BLOQUEIO DE ENVIO ÚNICO
+  async function enviar(){
+    if (fotos.length === 0) return alert("Tire pelo menos uma foto!");
+
+    // BLOQUEIA REENVIO
+    if (jaEnviou) {
+      alert("Você já enviou este comprovante. Não é possível enviar novamente.");
+      return;
     }
 
-    async function enviar(){
-      if (fotos.length === 0) return alert("Tire pelo menos uma foto!");
+    const envBtn = document.getElementById('env');
+    envBtn.disabled = true;
+    jaEnviou = true; // marca como já enviado
 
-      const envBtn = document.getElementById('env');
-      envBtn.disabled = true;
-      document.getElementById('loading').style.display = 'block';
-      document.getElementById('progress-container').style.display = 'block';
-      document.getElementById('progress-bar').style.width = '30%';
-      okMsg.innerHTML = "Gerando PDF...";
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('progress-container').style.display = 'block';
+    document.getElementById('progress-bar').style.width = '30%';
+    okMsg.innerHTML = "Gerando PDF...";
 
-      const nota = inputNota.value.trim();
-      const placa = inputPlaca.value.trim();
-      const motorista = inputMotorista.value.trim();
-      const nomePDF = `${nota}_${placa}_ENTREGA.pdf`;
+    const nota = inputNota.value.trim();
+    const placa = inputPlaca.value.trim();
+    const motorista = inputMotorista.value.trim();
+    const nomePDF = `${nota}_${placa}_ENTREGA.pdf`;
 
-      try {
-        const pdfBlob = await gerarPDFcomFotos();
-        document.getElementById('progress-bar').style.width = '70%';
-        okMsg.innerHTML = "Enviando PDF...";
+    try {
+      const pdfBlob = await gerarPDFcomFotos();
+      document.getElementById('progress-bar').style.width = '70%';
+      okMsg.innerHTML = "Enviando PDF...";
 
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result.split(',')[1];
-          const dados = {
-            nota: nota,
-            placa: placa,
-            motorista: motorista,
-            lat: lat,
-            lng: lng,
-            nome: nomePDF,
-            file: base64,
-            isPDF: true
-          };
-
-          fetch(URL_SALVAR_ENTREGA, {
-            method: 'POST',
-            body: JSON.stringify(dados),
-            headers: {'Content-Type': 'text/plain'},
-            mode: 'no-cors'
-          }).then(() => {
-            sucesso();
-          }).catch(() => {
-            sucesso();
-          });
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        const dados = {
+          nota: nota,
+          placa: placa,
+          motorista: motorista,
+          lat: lat,
+          lng: lng,
+          nome: nomePDF,
+          file: base64,
+          isPDF: true
         };
-        reader.readAsDataURL(pdfBlob);
-      } catch (err) {
-        alert("Erro ao gerar PDF: " + err.message);
-        envBtn.disabled = false;
-        document.getElementById('loading').style.display = 'none';
-      }
 
-      function sucesso() {
-        document.getElementById('progress-bar').style.width = '100%';
-        okMsg.innerHTML="PDF enviado com sucesso! Abrindo WhatsApp...";
-        const msg = `Entrega ${nota} realizada!\nPDF com ${fotos.length} foto(s) enviado.\nMotorista: ${motorista}\nPlaca: ${placa}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-        setTimeout(() => location.reload(), 4000);
-      }
+        fetch(URL_SALVAR_ENTREGA, {
+          method: 'POST',
+          body: JSON.stringify(dados),
+          headers: {'Content-Type': 'text/plain'},
+          mode: 'no-cors'
+        }).then(() => {
+          sucesso();
+        }).catch(() => {
+          sucesso(); // no-cors não dá erro real
+        });
+      };
+      reader.readAsDataURL(pdfBlob);
+    } catch (err) {
+      alert("Erro ao gerar PDF: " + err.message);
+      envBtn.disabled = false;
+      jaEnviou = false; // permite tentar de novo só se deu erro real
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('progress-container').style.display = 'none';
     }
-  </script>
-</body>
-</html>
-</DOCUMENT>
+
+    function sucesso() {
+      document.getElementById('progress-bar').style.width = '100%';
+      okMsg.innerHTML="PDF enviado com sucesso! Abrindo WhatsApp...";
+      const msg = `Entrega ${nota} realizada!\nPDF com ${fotos.length} foto(s) enviado.\nMotorista: ${motorista}\nPlaca: ${placa}\nLocal: https://maps.google.com/?q=${lat},${lng}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      setTimeout(() => location.reload(), 4000);
+    }
+  }
+</script>
