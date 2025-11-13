@@ -8,9 +8,51 @@
   <style>
     body{font-family:Arial;background:#f8f9fa;margin:0;padding:20px;text-align:center}
     .c{background:#fff;max-width:420px;margin:auto;padding:30px;border-radius:25px;box-shadow:0 15px 40px rgba(0,0,0,.2);overflow:hidden}
-    .logo{width:210px;margin:20px auto;display:block}  <!-- ← reduzido ~25% -->
-    input,button{width:90%;padding:16px;margin:12px auto;display:block;border-radius:12px;border:2px solid #007bff;font-size:18px;box-sizing:border-box}
-    button{background:#007bff;color:#fff;font-weight:bold;cursor:pointer}
+    .logo{width:210px;margin:20px auto;display:block}
+    
+    /* ← CAMPOS MAIS ALTOS E BONITOS */
+    input{
+      width:90%;
+      padding:18px 16px !important;   /* mais altura */
+      margin:14px auto;
+      display:block;
+      border-radius:14px !important;
+      border:2px solid #007bff;
+      font-size:18px !important;
+      box-sizing:border-box;
+      background:#fff;
+    }
+    
+    input:focus{
+      outline:none;
+      border-color:#0056b3;
+      box-shadow:0 0 0 3px rgba(0,123,255,0.2);
+    }
+    
+    button{
+      width:90%;
+      padding:18px;
+      margin:20px auto 10px;
+      display:block;
+      border-radius:14px;
+      border:none;
+      background:#007bff;
+      color:#fff;
+      font-size:18px;
+      font-weight:bold;
+      cursor:pointer;
+      box-shadow:0 4px 15px rgba(0,123,255,0.3);
+    }
+    
+    /* ← BOTÃO INICIAR TOTALMENTE CENTRALIZADO */
+    #btnIniciar{
+      width:85% !important;
+      max-width:340px;
+      margin:25px auto !important;
+      padding:19px !important;
+      font-size:19px !important;
+    }
+
     .fotos{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:15px 0}
     .foto-prev{width:100px;height:100px;object-fit:cover;border-radius:10px;border:2px solid #007bff;position:relative}
     .remover{position:absolute;top:5px;right:5px;background:red;color:white;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;cursor:pointer}
@@ -21,7 +63,7 @@
     .camera-actions{width:90%;margin:10px auto 0;display:flex;justify-content:center;gap:10px}
     .camera-actions button{width:100%;padding:14px;font-size:16px;margin:0}
 
-    .obs p{font-size:17px;line-height:1.6;margin:14px 0}  <!-- ← fonte maior -->
+    .obs p{font-size:17px;line-height:1.6;margin:14px 0}
     .exemplo-container{width:90%;max-width:400px;margin:20px auto;border:2px dashed #007bff;border-radius:12px;overflow:hidden;background:#f0f8ff;padding:10px;box-sizing:border-box}
     .exemplo-img{width:100%;height:auto;max-height:300px;object-fit:contain;border-radius:8px;display:block;margin:0 auto}
 
@@ -36,8 +78,9 @@
     <h2>Comprovante de Entrega</h2>
 
     <div class="obs">
-      <p>Imagens em boas condições caso contrário será solicitado novo envio.<br>
-      SITE PRECISA DE PERMISSÃO — clique em "Permitir" para continuar.</p>
+      <p>Fotos devem ser nítidas e bem iluminadas.<br>
+      Fotos não Legíveis serão solicitadas novamente.<br>
+      O site pedirá permissões — clique em "Permitir" para continuar.</p>
       <div class="exemplo-container">
         <img src="exemplo.jpg" alt="Foto de exemplo" class="exemplo-img" onerror="this.style.display='none'">
       </div>
@@ -58,6 +101,7 @@
     Processando...
   </div>
 
+  <!-- Todo o JavaScript continua 100% igual ao original (não alterado) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const { jsPDF } = window.jspdf;
