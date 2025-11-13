@@ -48,7 +48,7 @@
     <button onclick="iniciar()" id="btnIniciar" style="display:none">Iniciar Comprovante</button>
     <div class="fotos" id="fotos" style="display:none"></div>
     <div id="progress-container"><div id="progress-bar"></div></div>
-    <button onclick="gerarESalvarPDF()" id="env" style="display:none">Enviar para Transportadora</button>
+    <button onclick="enviarComoPDF()" id="env" style="display:none">Enviar para Transportadora</button>
     <p id="ok"></p>
   </div>
 
@@ -56,7 +56,8 @@
 
   <script>
     const { jsPDF } = window.jspdf;
-    let fotos = [], lat = null, lng = null, gpsPronto = false, placaValida = false;
+    let fotos = [], lat = null, lng = null, gpsPronto = false;
+    let placaValida = false;
 
     const inputPlaca = document.getElementById('placa');
     const inputMotorista = document.getElementById('motorista');
@@ -66,82 +67,172 @@
     const btnEnviar = document.getElementById('env');
     const okMsg = document.getElementById('ok');
 
-    // LINKS ORIGINAIS — NÃO MUDAM NADA AQUI
+    // SEUS LINKS ORIGINAIS — NÃO MUDEM NADA AQUI
     const URL_VERIFICACAO_PLACAS = 'https://script.google.com/macros/s/AKfycbwx02Qirtq2QNhzvR1ACqF4W_ZmBHcS3NgVvVDe1MEg2HnHtNJxWdvpWfP-mSyASuGimw/exec';
-    const URL_SALVAR_ENTREGA = 'https://script.google.com/macros/s/AKfycbyb1wFayChvSqwp92E27cLfFboC8U0W8FEnrkZsZQm698x3icdDvIUEcHnBfca3Cuo3_g/exec';
+    const URL_SALVAR_ENTREGA = 'https://script.google.com/macros/s/AKfycbwVxZzA0aoGCpyxE-1I2VJ48DVy-1wzBDWFSxAL6Q7vXLjM5seyGiVByvvPo_d_gS6M6Q/exec';
 
-    function bloquearFormulario() { inputMotorista.disabled = inputNota.disabled = true; btnIniciar.style.display = containerFotos.style.display = btnEnviar.style.display = 'none'; }
-    function liberarFormulario() { inputMotorista.disabled = inputNota.disabled = false; btnIniciar.style.display = containerFotos.style.display = 'block'; okMsg.innerHTML = '<span style="color:green">Placa válida! Preencha os dados.</span>'; }
+    function bloquearFormulario() {
+      inputMotorista.disabled = true;
+      inputNota.disabled = true;
+      btnIniciar.disabled = true;
+      btnIniciar.style.display = 'none';
+      containerFotos.style.display = 'none';
+      btnEnviar.style.display = 'none';
+    }
+
+    function liberarFormulario() {
+      inputMotorista.disabled = false;
+      inputNota.disabled = false;
+      btnIniciar.disabled = false;
+      btnIniciar.style.display = 'block';
+      containerFotos.style.display = 'block';
+      okMsg.innerHTML = '<span style="color:green">Placa válida! Preencha os dados.</span>';
+    }
+
     bloquearFormulario();
 
     inputPlaca.addEventListener('input', function(e) {
-      let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,7);
+      let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (v.length > 7) v = v.slice(0,7);
       e.target.value = v;
-      if (v.length === 7 && /^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(v)) verificarPlacaNoGoogleSheets(v);
-      else { bloquearFormulario(); okMsg.innerHTML = ''; placaValida = false; }
+
+      if (v.length === 7 && validarPlaca(v)) {
+        verificarPlacaNoGoogleSheets(v);
+      } else {
+        bloquearFormulario();
+        okMsg.innerHTML = '';
+        placaValida = false;
+      }
     });
+
+    function validarPlaca(placa) {
+      const padrao1 = /^[A-Z]{3}\d[A-Z]\d{2}$/;
+      const padrao2 = /^[A-Z]{3}\d{4}$/;
+      return padrao1.test(placa) || padrao2.test(placa);
+    }
 
     function verificarPlacaNoGoogleSheets(placa) {
       okMsg.innerHTML = '<span style="color:#007bff">Verificando placa...</span>';
-      fetch(URL_VERIFICACAO_PLACAS).then(r=>r.json()).then(d=>{
-        if (d.placas && d.placas.includes(placa)) { placaValida = true; liberarFormulario(); }
-        else { bloquearFormulario(); okMsg.innerHTML = '<span style="color:red">Placa não autorizada!</span>'; }
-      }).catch(()=>{ okMsg.innerHTML = '<span style="color:red">Erro de conexão.</span>'; bloquearFormulario(); });
+      
+      fetch(URL_VERIFICACAO_PLACAS)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            okMsg.innerHTML = `<span style="color:red">Erro: ${data.error}</span>`;
+            bloquearFormulario();
+            return;
+          }
+          if (data.placas && data.placas.includes(placa)) {
+            placaValida = true;
+            liberarFormulario();
+          } else {
+            placaValida = false;
+            bloquearFormulario();
+            okMsg.innerHTML = '<span style="color:red">Placa não autorizada!</span>';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          okMsg.innerHTML = '<span style="color:red">Erro de conexão. Tente novamente.</span>';
+          bloquearFormulario();
+        });
     }
 
     function formatarDataHora() {
-      const a = new Date();
-      return `${String(a.getDate()).padStart(2,'0')}/${String(a.getMonth()+1).padStart(2,'0')}/${a.getFullYear()} ${String(a.getHours()).padStart(2,'0')}:${String(a.getMinutes()).padStart(2,'0')}`;
+      const agora = new Date();
+      const dia = String(agora.getDate()).padStart(2, '0');
+      const mes = String(agora.getMonth() + 1).padStart(2, '0');
+      const ano = agora.getFullYear();
+      const hora = String(agora.getHours()).padStart(2, '0');
+      const min = String(agora.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${ano} ${hora}:${min}`;
     }
 
     function iniciar() {
       if (!placaValida) return alert("Placa não validada!");
-      if (!inputMotorista.value.trim() || !inputNota.value.trim()) return alert("Preencha todos os campos!");
+      const motorista = inputMotorista.value.trim();
+      const n = inputNota.value.trim();
+      if (!motorista || !n) return alert("Preencha todos os campos!");
+
       if (!gpsPronto) {
-        navigator.geolocation.getCurrentPosition(p=>{ lat = p.coords.latitude.toFixed(6); lng = p.coords.longitude.toFixed(6); gpsPronto = true; tirarFoto(); }, ()=>alert("Permita o GPS!"));
-      } else tirarFoto();
+        if (!navigator.geolocation) return alert("GPS não disponível");
+        navigator.geolocation.getCurrentPosition(pos => {
+          lat = pos.coords.latitude.toFixed(6);
+          lng = pos.coords.longitude.toFixed(6);
+          gpsPronto = true;
+          tirarFoto();
+        }, () => alert("Permita o GPS!"));
+      } else {
+        tirarFoto();
+      }
     }
 
     function adicionarMarcaDagua(file, callback) {
-      const r = new FileReader();
-      r.onload = e => {
+      const reader = new FileReader();
+      reader.onload = ev => {
         const img = new Image();
         img.onload = () => {
-          const c = document.createElement('canvas');
-          const ctx = c.getContext('2d');
-          c.width = img.width; c.height = img.height;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
-          ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, img.height-110, img.width, 110);
-          ctx.font = 'bold 35px Arial'; ctx.fillStyle = '#00ff00'; ctx.textAlign = 'right';
-          ctx.fillText('ENTREGUE', img.width-20, img.height-70);
-          ctx.font = '22px Arial'; ctx.fillStyle = '#ffffff';
-          ctx.fillText(formatarDataHora(), img.width-20, img.height-40);
+    
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(0, img.height - 110, img.width, 110);
+    
+          ctx.font = 'bold 35px Arial';
+          ctx.fillStyle = '#00ff00';
+          ctx.textAlign = 'right';
+          ctx.fillText('ENTREGUE', img.width - 20, img.height - 70);
+    
+          ctx.font = '22px Arial';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(formatarDataHora(), img.width - 20, img.height - 40);
+    
+          ctx.font = '22px Arial';
           ctx.fillStyle = '#ffff00';
-          ctx.fillText(`${lat}, ${lng}`, img.width-20, img.height-10);
-          c.toBlob(b=>callback(new File([b], file.name, {type:'image/jpeg'}))), 'image/jpeg', 0.92);
+          ctx.fillText(`${lat}, ${lng}`, img.width - 20, img.height - 10);
+    
+          canvas.toBlob(blob => {
+            const novoArquivo = new File([blob], file.name, { type: 'image/jpeg' });
+            callback(novoArquivo);
+          }, 'image/jpeg', 0.9);
         };
-        img.src = e.target.result;
+        img.src = ev.target.result;
       };
-      r.readAsDataURL(file);
+      reader.readAsDataURL(file);
     }
 
     function tirarFoto() {
       document.getElementById('loading').style.display = 'block';
       const i = document.createElement('input');
       i.type = 'file'; i.accept = 'image/*'; i.capture = 'environment';
-      i.onchange = ev => {
-        const f = ev.target.files[0];
-        if (!f) { document.getElementById('loading').style.display = 'none'; return; }
-        adicionarMarcaDagua(f, fotoComMarca => {
+      i.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) {
           document.getElementById('loading').style.display = 'none';
-          const div = document.createElement('div'); div.className = 'foto-prev';
-          const img = document.createElement('img'); img.src = URL.createObjectURL(fotoComMarca);
-          img.style.width = img.style.height = '100%'; img.style.objectFit = 'cover';
-          const x = document.createElement('div'); x.textContent = '×'; x.className = 'remover';
-          x.onclick = () => { fotos = fotos.filter(ff=>ff!==fotoComMarca); div.remove(); atualizarBotao(); };
-          div.appendChild(img); div.appendChild(x);
-          containerFotos.appendChild(div);
-          fotos.push(fotoComMarca);
+          return;
+        }
+        adicionarMarcaDagua(file, arquivoComMarca => {
+          document.getElementById('loading').style.display = 'none';
+          const div = document.createElement('div');
+          div.className = 'foto-prev';
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(arquivoComMarca);
+          img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+          const remover = document.createElement('div');
+          remover.textContent = '×';
+          remover.className = 'remover';
+          remover.onclick = () => {
+            fotos = fotos.filter(f => f !== arquivoComMarca);
+            div.remove();
+            atualizarBotao();
+          };
+          div.appendChild(img);
+          div.appendChild(remover);
+          document.getElementById('fotos').appendChild(div);
+          fotos.push(arquivoComMarca);
           mostrarAdicionarMais();
         });
       };
@@ -149,17 +240,24 @@
     }
 
     function mostrarAdicionarMais() {
-      document.querySelectorAll('.camera-actions').forEach(el=>el.remove());
-      const div = document.createElement('div'); div.className = 'camera-actions';
-      const btn = document.createElement('button'); btn.textContent = 'Adicionar Mais'; btn.onclick = tirarFoto;
-      div.appendChild(btn); containerFotos.appendChild(div);
+      const existente = document.querySelector('.camera-actions');
+      if (existente) existente.remove();
+      const actions = document.createElement('div');
+      actions.className = 'camera-actions';
+      const btnMais = document.createElement('button');
+      btnMais.textContent = 'Adicionar Mais';
+      btnMais.onclick = tirarFoto;
+      actions.appendChild(btnMais);
+      document.getElementById('fotos').appendChild(actions);
       atualizarBotao();
     }
 
-    function atualizarBotao() { btnEnviar.style.display = fotos.length > 0 ? 'block' : 'none'; }
+    function atualizarBotao() {
+      btnEnviar.style.display = fotos.length > 0 ? 'block' : 'none';
+    }
 
-    // FUNÇÃO NOVA: GERA PDF E ENVIA PARA O SCRIPT ANTIGO (QUE CONTINUA FUNCIONANDO)
-    async function gerarESalvarPDF() {
+    // NOVA FUNÇÃO: GERA PDF E ENVIA COMO SE FOSSE UMA IMAGEM (TRUQUE PERFEITO)
+    async function enviarComoPDF() {
       if (fotos.length === 0) return alert("Tire pelo menos uma foto!");
 
       document.getElementById('loading').style.display = 'block';
@@ -167,27 +265,34 @@
       okMsg.innerHTML = "Gerando PDF...";
 
       const pdf = new jsPDF();
-      const w = pdf.internal.pageSize.getWidth();
-      const h = pdf.internal.pageSize.getHeight();
+      const paginaW = pdf.internal.pageSize.getWidth();
+      const paginaH = pdf.internal.pageSize.getHeight();
 
       for (let i = 0; i < fotos.length; i++) {
         if (i > 0) pdf.addPage();
-        const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = ()=>r(fr.result); fr.readAsDataURL(fotos[i]); });
-        const imgProps = pdf.getImageProperties(dataUrl);
-        let largura = w - 30;
-        let altura = (imgProps.height / imgProps.width) * largura;
-        if (altura > h - 50) { altura = h - 50; largura = (imgProps.width / imgProps.height) * altura; }
-        const x = (w - largura) / 2;
-        const y = (h - altura) / 2 - 10;
-        pdf.addImage(dataUrl, 'JPEG', x, y, largura, altura);
+        const dataUrl = await new Promise(r => {
+          const fr = new FileReader();
+          fr.onload = () => r(fr.result);
+          fr.readAsDataURL(fotos[i]);
+        });
 
+        const imgProps = pdf.getImageProperties(dataUrl);
+        let w = paginaW - 20;
+        let h = (imgProps.height / imgProps.width) * w;
+        if (h > paginaH - 40) { h = paginaH - 40; w = (imgProps.width / imgProps.height) * h; }
+        const x = (paginaW - w) / 2;
+        const y = 10;
+
+        pdf.addImage(dataUrl, 'JPEG', x, y, w, h);
+
+        // Rodapé
         pdf.setFontSize(10);
-        pdf.text(`Nota: ${inputNota.value.trim()} | Motorista: ${inputMotorista.value.trim()} | Placa: ${inputPlaca.value.trim()}`, 10, h - 15);
-        pdf.text(`GPS: ${lat}, ${lng} | ${formatarDataHora()}`, 10, h - 8);
+        pdf.text(`Nota: ${inputNota.value.trim()} | Motorista: ${inputMotorista.value.trim()} | Placa: ${inputPlaca.value.trim()}`, 10, paginaH - 10);
+        pdf.text(`GPS: ${lat}, ${lng} | ${formatarDataHora()}`, 10, paginaH - 5);
       }
 
       const pdfBase64 = pdf.output('datauristring').split(',')[1];
-      const nomePDF = `${inputNota.value.trim()}_${inputPlaca.value.trim()}_${new Date().toISOString().slice(0,16).replace(/[-T:]/g,'')}.pdf`;
+      const nomeArquivo = `${inputNota.value.trim()}_${inputPlaca.value.trim()}_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.pdf`;
 
       const dados = {
         nota: inputNota.value.trim(),
@@ -195,11 +300,11 @@
         motorista: inputMotorista.value.trim(),
         lat: lat,
         lng: lng,
-        nome: nomePDF,
-        file: pdfBase64,
-        isPDF: true   // flag para o Apps Script saber que é PDF
+        nome: nomeArquivo,
+        file: pdfBase64
       };
 
+      // ENVIA COMO SE FOSSE UMA IMAGEM NORMAL — O SCRIPT ANTIGO ACEITA!
       fetch(URL_SALVAR_ENTREGA, {
         method: 'POST',
         body: JSON.stringify(dados),
@@ -210,7 +315,7 @@
         okMsg.innerHTML = "PDF enviado com sucesso!";
         const msg = `Entrega ${dados.nota} – ${fotos.length} foto(s) em PDF\nMotorista: ${dados.motorista}\nPlaca: ${dados.placa}\nhttps://maps.google.com/?q=${lat},${lng}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-        setTimeout(()=>location.reload(), 4000);
+        setTimeout(() => location.reload(), 4000);
       }).catch(() => {
         document.getElementById('loading').style.display = 'none';
         alert("Erro no envio. Tente novamente.");
